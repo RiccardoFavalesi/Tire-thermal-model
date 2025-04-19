@@ -5,7 +5,7 @@ clear all
 data9 = load("Dati Calspan\B2356raw9.mat")
 figure(1)
 subplot(2,1,1)
-plot(data9.RST)
+plot(data9.RST);
 hold on
 plot(data9.TSTC)
 plot(data9.AMBTMP)
