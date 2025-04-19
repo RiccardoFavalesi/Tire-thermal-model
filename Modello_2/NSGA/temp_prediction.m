@@ -1,0 +1,113 @@
+clc
+clear all
+%close all
+
+Model_Name = "Tread_carcass_Tire_thermal_model_simplified.slx";
+Data_Name = "B2356raw5.mat";
+
+
+%% Load data
+
+data = load(Data_Name);
+TSTC = data.TSTC;
+indexi = 1;
+indexf = length(TSTC);
+% indexi = 200e2;
+%indexf = 800e2;
+firstindex = ceil(indexi/100);
+stop_sim = floor(indexf/100);
+timevals = data.ET(indexi:indexf);
+dt = timevals(2) - timevals(1);
+Re    = data.RE(indexi:indexf);   % [cm]
+Re    = Re/100;              % [m]
+omega = data.N(indexi:indexf);    % [rpm]
+omega = omega*pi/30;         % [rad/s] 
+Vx    = data.V(indexi:indexf);    % [kph] 
+Vx    = Vx/3.6;              % [m/s]
+Fy    = data.FY(indexi:indexf);   % [N] 
+Fx    = data.FX(indexi:indexf);   % [N]
+Fz    = data.FZ(indexi:indexf);   % [N]
+p_inf = data.P(indexi:indexf);    % [kPa]
+p_inf = p_inf*1000;          % [Pa]
+Vs = Vx - omega.*Re; %sliding speed (from Brush Model)
+T_amb = data.AMBTMP(indexi:indexf);
+T_road = data.RST(indexi:indexf);
+force = sqrt(Fx.^2 + Fy.^2);
+mu_d = force./Fz;
+w_cp = 0.12; % [m]
+
+%% Load optimised variable
+
+load("best_individuals_run5.mat");
+%%
+exponentialcoefficient_Fz = best_individual(1)
+    exponentialcoefficient_p =  best_individual(2)
+a_coeff = best_individual(3)
+H_tread_road      = best_individual(4)
+H_ta_proportional = best_individual(5)
+H_ta_constant = best_individual(6)
+b_coeff = best_individual(7)
+H_tc = best_individual(9)
+S_tread   = best_individual(8)          % [J/(kg*K)]
+S_gas     = 1042;         % [J/(kg*K)]
+M_tread   = 0.45;           % [kg]
+scaling_Qambient = 1; 
+
+T_road = timeseries(T_road, timevals);
+T_amb = timeseries(T_amb, timevals);
+mu_d = abs(mu_d);
+mu_d = timeseries(mu_d, timevals);
+Fx = abs(Fx);
+Fx = timeseries(Fx, timevals);
+Fy = abs(Fy);
+Fy = timeseries(Fy, timevals);
+Fz = abs(Fz);
+Fz = timeseries(Fz, timevals);
+Vs = abs(Vs);
+Vs = timeseries(Vs, timevals);
+Vx = abs(Vx);
+Vx = timeseries(Vx, timevals);
+p_inf = timeseries(p_inf, timevals);
+
+%thermal_model_differential_simplified_new;
+out = sim(Model_Name);
+
+%% Result analysis
+
+figure();
+plot(timevals,TSTC(indexi:indexf),'LineWidth',2);
+hold on;
+grid on;
+plot(out.simout.Time,out.simout.Data,'LineWidth',2);
+legend('data','model');
+xlabel('time');
+ylabel('temperature [°C]');
+
+%% 
+TEMP_modello = interp1(out.simout.Time, out.simout.Data, timevals,'linear', 'extrap');
+
+errore = TEMP_modello - TSTC ;
+
+figure
+subplot(2,1,1)
+plot(timevals, TEMP_modello, 'LineWidth',1.5);
+hold on
+grid on
+plot(timevals, TSTC, 'LineWidth', 1.5)
+legend('Temp. modello', 'temp. Calspan')
+rms_errore = rms(errore);
+subplot(2,1,2)
+plot(timevals, errore)
+hold on
+yline(rms_errore, 'LineWidth', 2)
+linkaxes([subplot(2,1,1), subplot(2,1,2)], 'x');
+results = best_individual;
+results(1, length(results)+1) = rms_errore;
+results(1, length(results)+1) = 30;
+grid on
+
+
+MAPE = mape(TEMP_modello, TSTC)
+mean_abs_err = mean(abs(errore))
+rms_errore
+
